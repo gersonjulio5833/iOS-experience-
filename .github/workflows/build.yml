@@ -1,0 +1,41 @@
+name: Compilar APK
+on:
+  push:
+  workflow_dispatch: {}
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extrair projeto
+        run: unzip -o -q iphone-experience-source.zip -x ".github/*"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Interface
+        run: |
+          npm ci || npm install
+          npm run build
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: "8.7"
+      - name: Chave
+        run: |
+          keytool -genkeypair -keystore android/app/debug.keystore -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          rm -f android/local.properties
+      - name: APK
+        working-directory: android
+        run: gradle assembleDebug --no-daemon
+      - run: cp android/app/build/outputs/apk/debug/app-debug.apk iPhoneExperience.apk
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: iPhone Experience ${{ github.run_number }}
+          files: iPhoneExperience.apk
